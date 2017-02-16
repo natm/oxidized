@@ -154,6 +154,8 @@ Oxidized is a network device configuration backup tool. It's a RANCID replacemen
    * [EdgeSwitch](lib/oxidized/model/edgeswitch.rb)
  * Watchguard
    * [Fireware OS](lib/oxidized/model/firewareos.rb)
+ * Zhone
+   * [Zhone (OLT and MX)](lib/oxidized/model/zhoneolt.rb)
  * Zyxel
    * [ZyNOS](lib/oxidized/model/zynos.rb)
 
@@ -184,6 +186,14 @@ Now let's install oxidized via Rubygems:
 ```shell
 gem install oxidized
 gem install oxidized-script oxidized-web
+```
+
+## Build from Git
+```shell
+git clone https://github.com/ytti/oxidized.git
+cd oxidized/
+gem build *.gemspec
+gem install pkg/*.gem
 ```
 
 # Configuration
@@ -233,12 +243,15 @@ oxidized
 
 Now tell Oxidized where it finds a list of network devices to backup configuration from. You can either use CSV or SQLite as source. To create a CSV source add the following snippet:
 
+Note: If gpg is set to anything other than false it will attempt to decrypt the file contents
 ```
 source:
   default: csv
   csv:
     file: ~/.config/oxidized/router.db
     delimiter: !ruby/regexp /:/
+    gpg: false
+    gpg_password: 'password'
     map:
       name: 0
       model: 1
@@ -346,14 +359,18 @@ docker run -v /etc/oxidized:/root/.config/oxidized -p 8888:8888/tcp -e CONFIG_RE
 
 ## Cookbook
 ### Debugging
-In case a model plugin doesn't work correctly (ios, procurve, etc.), you can enable live debugging of SSH/Telnet sessions. Just add a ```debug``` option, specifying a log file destination to the ```input``` section.
+In case a model plugin doesn't work correctly (ios, procurve, etc.), you can enable live debugging of SSH/Telnet sessions. Just add a ```debug``` option containing the value true to the ```input``` section. The log files will be created depending on the parent directory of the logfile option.
 
-The following example will log an active ssh session to ```/home/fisakytt/.config/oxidized/log_input-ssh``` and telnet to ```log_input-telnet```. The file will be truncated on each consecutive ssh/telnet session, so you need to put a ```tailf``` or ```tail -f``` on that file!
+The following example will log an active ssh/telnet session ```/home/oxidized/.config/oxidized/log/<IP-Adress>-<PROTOCOL>```. The file will be truncated on each consecutive ssh/telnet session, so you need to put a ```tailf``` or ```tail -f``` on that file!
 
 ```
+log: /home/oxidized/.config/oxidized/log
+
+...
+
 input:
   default: ssh, telnet
-  debug: /tmp/oxidized_log_input
+  debug: true
   ssh:
     secure: false
 ```
@@ -403,7 +420,7 @@ vars:
 
 ### Source: CSV
 
-One line per device, colon seperated.
+One line per device, colon seperated. If `ip` isn't present, a DNS lookup will be done against `name`.  For large installations, setting `ip` will dramatically reduce startup time.
 
 ```
 source:
@@ -413,11 +430,12 @@ source:
     delimiter: !ruby/regexp /:/
     map:
       name: 0
-      model: 1
-      username: 2
-      password: 3
+      ip: 1
+      model: 2
+      username: 3
+      password: 4
     vars_map:
-      enable: 4
+      enable: 5
 ```
 
 ### SSH Proxy Command
@@ -723,6 +741,16 @@ map:
   model: 0
   name: 1
   group: 2
+```
+
+### Triggered backups
+
+A node can be moved to head-of-queue via the REST API `GET/POST /node/next/[NODE]`.
+
+In the default configuration this node will be processed when the next job worker becomes available, it could take some time if existing backups are in progress. To execute moved jobs immediately a new job can be added:
+
+```
+next_adds_job: true
 ```
 
 # Hooks

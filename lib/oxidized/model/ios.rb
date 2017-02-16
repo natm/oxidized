@@ -26,7 +26,9 @@ class IOS < Oxidized::Model
     cfg.gsub! /^(snmp-server community).*/, '\\1 <configuration removed>'
     cfg.gsub! /username (\S+) privilege (\d+) (\S+).*/, '<secret hidden>'
     cfg.gsub! /^username \S+ password \d \S+/, '<secret hidden>'
-    cfg.gsub! /^enable password \d \S+/, '<secret hidden>'
+    cfg.gsub! /^username \S+ secret \d \S+/, '<secret hidden>'
+    cfg.gsub! /^enable (password|secret) \d \S+/, '<secret hidden>'
+    cfg.gsub! /^(\s+(?:password|secret)) (?:\d )?\S+/, '\\1 <secret hidden>'
     cfg.gsub! /wpa-psk ascii \d \S+/, '<secret hidden>'
     cfg.gsub! /^tacacs-server key \d \S+/, '<secret hidden>'
     cfg
@@ -56,8 +58,6 @@ class IOS < Oxidized::Model
   end
 
   cfg :telnet, :ssh do
-    post_login 'terminal length 0'
-    post_login 'terminal width 0'
     # preferred way to handle additional passwords
     if vars :enable
       post_login do
@@ -65,6 +65,8 @@ class IOS < Oxidized::Model
         cmd vars(:enable)
       end
     end
+    post_login 'terminal length 0'
+    post_login 'terminal width 0'
     pre_logout 'exit'
   end
 
